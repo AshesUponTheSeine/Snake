@@ -16,7 +16,7 @@ struct pos { int x, y; };
 
 // Returns the location of a valid pellet
 // TODO: Keeps trying until it finds a vacant spot - not efficient late-game!
-struct pos placePellet(WINDOW* win) {
+void placePellet(WINDOW* win) {
   struct pos pellet;
 
   do {
@@ -24,12 +24,15 @@ struct pos placePellet(WINDOW* win) {
     pellet.y = rand()%SIZE + 1;
   } while(mvwinch(win, pellet.y, pellet.x) == '#');
 
-  return pellet;
+  mvwaddch(win, pellet.y, pellet.x, PELLET);
 }
 
 // Moves the snake by 1 unit; updating both the window and the data structure
 int moveSnake(WINDOW* win, struct pos* snake, int length, int vx, int vy) {
   int result = 0;
+
+  // This if statement prevents the game from writing over the position of 0, 0 when a pellet is eaten
+  if(snake[length-1].y) mvwaddch(win, snake[length-1].y, snake[length-1].x, ' ');
 
   for(int i = length-1; i > 0; i--) {
     snake[i].x = snake[i-1].x;
@@ -51,14 +54,15 @@ int moveSnake(WINDOW* win, struct pos* snake, int length, int vx, int vy) {
 
 int main() {
   struct pos snake[SIZE*SIZE];
-  struct pos pellet;
   int length = 5;
   int vx = -1, vy = 0;
   int qvx = 0, qvy = 0;
   bool buffer = false;
 
   int ch;
-  clock_t time = clock();
+  clock_t t= clock();
+
+  srand(time(NULL));
 
   // Build tail to the right of the starting point
   // I trust people not to be dumb and make the tail go past the border
@@ -78,9 +82,14 @@ int main() {
   // This should return an error, but will cause the display to appear
   getch();
 
+  // Create new game window
   WINDOW* game = newwin(SIZE+2, SIZE+2, 0, 0);
   wborder(game, 0, 0, 0, 0, 0, 0, 0, 0);
-  pellet = placePellet(game);
+
+  // Populate the board with the snake and pellet
+  moveSnake(game, snake, length, vx, vy);
+  placePellet(game);
+  wmove(game, snake[0].y, snake[0].x);
   wrefresh(game);
 
   while(true) {
@@ -128,13 +137,8 @@ int main() {
           }
           break;
       } 
-    else if(clock()-time > CLOCKS_PER_SEC/10) {
-      time = clock();
-
-      wclear(game);
-      wborder(game, 0, 0, 0, 0, 0, 0, 0, 0);
-
-      mvwaddch(game, pellet.y, pellet.x, PELLET);
+    else if(clock()-t > CLOCKS_PER_SEC/10) {
+      t = clock();
 
       int result;
       if((result = moveSnake(game, snake, length, vx, vy)) == -1) {
@@ -142,8 +146,7 @@ int main() {
         return 0;
       } else if(result) {
         length++;
-        pellet = placePellet(game);
-        mvwaddch(game, pellet.y, pellet.x, PELLET);
+        placePellet(game);
       }
 
       wmove(game, snake[0].y, snake[0].x);
